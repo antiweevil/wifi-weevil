@@ -10,7 +10,7 @@ To install WiFi Weevil, run the following. `init.sh` will install any other need
 
 ```bash
 git clone https://github.com/antiweevil/wifi-weevil.git
-cd obscure-usb
+cd wifi-weevil
 bash init.sh
 ```
 
