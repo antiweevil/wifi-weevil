@@ -339,7 +339,7 @@ def get_handshake():
     try:
         hand_index = cap_data.index('WPA (')+5
         hand_count = int(cap_data[hand_index:hand_index+1])
-    except Exception as e:
+    except Exception:
         pass # Unknown encryption, could not get handshake
     if(hand_count < 1):
         # ——— Could not verify cap, bail
