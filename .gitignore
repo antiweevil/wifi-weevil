@@ -1,0 +1,4 @@
+captured/*
+temp/*
+!captured/.gitkeep
+!temp/.gitkeep
