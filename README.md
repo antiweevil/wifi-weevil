@@ -16,7 +16,7 @@ bash init.sh
 
 ## 🪡 Usage
 
-To use the program, first insert a WiFi adapter, specifically one that has packet injection capabilities. If you'd like more information about these WiFi adapters, read more at morrownr's guide [here](https://github.com/morrownr/USB-WiFi/blob/main/home/Recommended_Adapters_for_Kali_Linux.md).
+To use the program, first insert a WiFi adapter, specifically one that has packet injection capabilities. If you'd like more information about these WiFi adapters, read more at morrownr's guide [here](https://github.com/morrownr/USB-WiFi/blob/main/home/USB_WiFi_Adapters_that_are_supported_with_Linux_in-kernel_drivers.md).
 
 Then, you may run the program with the following.
 ```bash
