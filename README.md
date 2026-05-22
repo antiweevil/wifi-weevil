@@ -43,4 +43,4 @@ You can also run the program with arguments. The following is a description of e
 
 ## ‼️ Disclaimer
 
-Never use this program or any of its components on machines you do not own or have explicit permission to use. I am not responsible for any damages.
+Never use this program or any of its components on machines or networks you do not own or have explicit permission to use. I am not responsible for any damages.
