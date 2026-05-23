@@ -23,6 +23,8 @@ Then, you may run the program with the following.
 python3 weevil.py
 ```
 
+If you have git installed, you may also update the directory with `git pull`.
+
 Keep in mind that you may temporarily lose access to WiFi while the program is running, as your adapter is set to monitor mode to capture handshakes.
 
 You can also run the program with arguments. The following is a description of each argument and its function.

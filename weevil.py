@@ -67,7 +67,7 @@ def stop_mon():
             break
     try:
         check_output([f"sudo airmon-ng stop {this_adap}"],shell=True) # Stop monitor mode
-    except Exception as e:
+    except Exception:
         pass # Already closed, no need to stop
 
 # ——— Have user select adapter, store adapter, and stop monitor mode if enabled
@@ -160,7 +160,7 @@ def start_monitor():
         # ——— Clear temp folder
         try:
             run([f"sudo rm {this_dir}/temp/aps-*.*"],shell=True,stdout=DEVNULL, stderr=DEVNULL)
-        except Exception as e:
+        except Exception:
             pass # Temp folder is empty, no need to clear
 
         # ——— Output APs to csv in the temp folder
@@ -180,7 +180,7 @@ def start_monitor():
             tmp_bssids = df_tmp['BSSID'][0]
             gottenAPs = True # Success
             continue
-        except Exception as e:
+        except Exception:
             # ——— Failure to get access points, try again
             attempts += 1
             print(f'{str(reset)}{fg.boldred}(FAILURE){str(reset)} Search for access points | Searching again...\n' + str(reset))
