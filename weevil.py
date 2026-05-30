@@ -296,7 +296,7 @@ def get_handshake():
     print(f'{fg.boldblue}Selected{str(reset)} {my_selection['my_bssid']} ({my_selection['my_essid']}) (channel {my_selection['my_channel']})\n')
 
     # ——— Create new directory for cap
-    rs = my_selection['my_essid'] + '_' + str(round(time()))
+    rs = my_selection['my_essid'].replace(" ","") + '_' + str(round(time()))
     try:
         run([f'sudo mkdir -m 777 {this_dir}/captured/{rs}/'],shell=True)
     except Exception:
